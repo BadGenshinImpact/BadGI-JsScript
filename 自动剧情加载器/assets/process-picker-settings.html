@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>剧情选择</title>
+<style>
+  :root {
+    --app-bg: #f4f6fa;
+    --panel-bg: #ffffff;
+    --panel-border: #e5eaf2;
+    --panel-shadow: 0 8px 24px rgb(31 35 41 / 6%);
+    --text-primary: #1d2129;
+    --text-secondary: #86909c;
+    --brand: #1677ff;
+    --danger-soft: #fff1f0;
+    --radius-lg: 10px;
+    --radius-md: 7px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 100vw;
+    height: 100vh;
+    background: var(--app-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    color: var(--text-primary);
+  }
+  .screen { display: none; min-height: 0; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+  .panel {
+    width: 720px;
+    max-height: 82dvh;
+    background: var(--panel-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--panel-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .head { padding: 16px 20px 12px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .title { font-size: 15px; font-weight: 600; }
+  .count { font-size: 12px; color: var(--text-secondary); }
+  .crumbs { display: flex; align-items: center; gap: 6px; padding: 0 20px 12px; font-size: 12px; color: #687b91; }
+  .crumbs .sep { color: #b7c3d2; }
+  .crumbs .here { color: var(--text-primary); font-weight: 500; }
+  .toolbar { display: flex; gap: 8px; padding: 0 20px 12px; align-items: center; }
+  .search, .field input[type="text"] {
+    min-height: 30px; padding: 0 10px; border: 1px solid var(--panel-border); border-radius: var(--radius-md);
+    background: #fff; font-size: 13px; font-family: inherit; color: var(--text-primary); outline: none;
+  }
+  .search { flex: 1; background: var(--app-bg); }
+  .search:focus, .field input[type="text"]:focus { border-color: var(--brand); background: #fff; }
+  .btn {
+    min-height: 30px; padding: 0 12px; border: 0; border-radius: var(--radius-md); background: var(--app-bg);
+    color: #354a61; font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .btn:disabled { color: #9aa7b5; cursor: not-allowed; }
+  .seg { display: inline-flex; gap: 2px; padding: 4px; background: var(--app-bg); border-radius: var(--radius-md); }
+  .seg button { min-height: 22px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: #354a61; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .seg button.active { background: #dceeff; color: #1264d8; }
+  .list-head, .row { display: grid; grid-template-columns: 44px minmax(240px, 1fr) 120px; align-items: center; gap: 4px; }
+  .list-head { position: sticky; top: 0; margin: 0 -20px; padding: 7px 28px; background: #edf2f8; font-size: 12px; color: #687b91; }
+  .list-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 12px; }
+  #body { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+  .row { min-height: 39px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #354a61; font-size: 13px; font-family: inherit; text-align: left; cursor: pointer; }
+  .row:hover, .row.selected { background: #d9eaff; }
+  .row.unavailable { color: #9aa7b5; cursor: not-allowed; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 11px; color: #8998a9; text-align: right; }
+  .empty { min-height: 220px; display: grid; place-items: center; color: #91a0b0; font-size: 13px; }
+  .slot { display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px; }
+  .slot-title { font-size: 13px; font-weight: 650; }
+  .slot-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field span { font-size: 12px; color: #687b91; }
+  .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+  .checks label { display: flex; align-items: center; gap: 7px; min-height: 24px; font-size: 12px; }
+  .settings-head { display: flex; align-items: center; justify-content: space-between; }
+  .error { margin: 0 20px 12px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--danger-soft); color: #b42318; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="screen active" id="browserScreen">
+      <div class="head"><div class="title">选择剧情</div><div class="count" id="count">读取中…</div></div>
+      <div class="crumbs"><span>目录</span><span class="sep">/</span><span class="here" id="cwd">process</span></div>
+      <div class="toolbar">
+        <div class="seg">
+          <button type="button" data-seg="all">全部</button>
+          <button type="button" class="active" data-seg="run">可执行</button>
+        </div>
+        <input class="search" id="search" type="text" placeholder="筛选剧情或文件名">
+        <button class="btn" id="btnUp">返回上级</button>
+        <button class="btn" id="btnRefresh">重新读取</button>
+        <button class="btn" id="btnSettings" type="button">全局配置</button>
+      </div>
+      <div id="errorBox"></div>
+      <div class="list-wrap"><div class="list-head"><span>类型</span><span>名称</span><span style="text-align:right">状态</span></div><div id="body"></div></div>
+    </div>
+    <div class="screen" id="settingsScreen">
+      <div class="slot">
+        <div class="settings-head"><button class="btn" id="btnBack" type="button">返回剧情列表</button><div class="slot-title">全局配置</div></div>
+        <div class="slot-grid">
+          <label class="field"><span>战斗队伍，不填表示不切换</span><input id="team" type="text"></label>
+          <label class="field"><span>元素采集队伍</span><input id="elementTeam" type="text"></label>
+          <label class="field"><span>暂停键，例如 F10</span><input id="pause" type="text"></label>
+        </div>
+        <div class="checks">
+          <label><input id="noSkip" type="checkbox">关闭自动拾取</label>
+          <label><input id="noEat" type="checkbox">关闭自动吃药</label>
+          <label><input id="useBreakPoint" type="checkbox">从上次中断点继续</label>
+          <label><input id="xiaoxitongzhi" type="checkbox">启用消息通知</label>
+        </div>
+      </div>
+    </div>
+  </div>
+<script>
+(function () {
+  var state = { cwd: "process", upTo: null, folders: [], files: [], processes: [], picked: null, query: "", segment: "run", filling: false };
+  var body = document.getElementById("body"), cwd = document.getElementById("cwd"), count = document.getElementById("count");
+  var error = document.getElementById("errorBox"), browser = document.getElementById("browserScreen"), settings = document.getElementById("settingsScreen");
+  function post(url, data) { window.settingsUi.post(url, data || {}); }
+  function matches(text) { return !state.query || String(text).toLowerCase().indexOf(state.query.toLowerCase()) !== -1; }
+  function row(type, name, tag, selected, enabled, onClick) {
+    var item = document.createElement("button");
+    item.type = "button";
+    item.className = "row" + (selected ? " selected" : "") + (enabled ? "" : " unavailable");
+    item.innerHTML = "<span>" + type + "</span><span class='name'></span><span class='tag'></span>";
+    item.children[1].textContent = name;
+    item.children[2].textContent = tag;
+    if (enabled) item.onclick = onClick;
+    return item;
+  }
+  function render() {
+    cwd.textContent = state.cwd;
+    body.innerHTML = "";
+    var items = state.segment === "run" ? state.processes.filter(function (p) { return matches(p.name); }) : state.folders.concat(state.files).filter(function (p) { return matches(p.name); });
+    document.getElementById("btnUp").disabled = state.segment === "run" || state.cwd === "process" || !state.upTo;
+    count.textContent = state.segment === "run" ? "共 " + state.processes.length + " 个可用剧情" : "当前目录 " + (state.folders.length + state.files.length) + " 项";
+    if (!items.length) { var empty = document.createElement("div"); empty.className = "empty"; empty.textContent = "没有可显示的剧情"; body.appendChild(empty); return; }
+    items.forEach(function (item) {
+      if (state.segment === "run" || item.selectable) body.appendChild(row("剧情", item.name || item.label, "可执行", state.picked && state.picked.path === item.path, true, function () { pick(item); }));
+      else if (item.path && !item.selectable && state.files.indexOf(item) === -1) body.appendChild(row("目录", item.name, "进入", false, true, function () { post("/picker/enter", { path: item.path }); }));
+      else body.appendChild(row(item.selectable ? "剧情" : "文件", item.selectable ? (item.label || item.name) : item.name, item.selectable ? "可执行" : "不可执行", state.picked && state.picked.path === item.path, !!item.selectable, function () { pick(item); }));
+    });
+  }
+  function pick(item) {
+    var name = item.name || item.label;
+    state.picked = { path: item.path, name: name };
+    post("/picker/choose", state.picked);
+    render();
+  }
+  function payload() {
+    return ["team", "elementTeam", "pause"].reduce(function (data, name) { data[name] = document.getElementById(name).value.trim(); return data; }, {
+      noSkip: noSkip.checked, noEat: noEat.checked, useBreakPoint: useBreakPoint.checked, xiaoxitongzhi: xiaoxitongzhi.checked
+    });
+  }
+  function fill(data) {
+    state.filling = true;
+    if (data.process_selector && data.process_path) state.picked = { name: data.process_selector, path: data.process_path };
+    ["team", "elementTeam", "pause", "noSkip", "noEat", "useBreakPoint", "xiaoxitongzhi"].forEach(function (name) {
+      var input = document.getElementById(name);
+      if (input.type === "checkbox") input.checked = !!data[name]; else input.value = data[name] || "";
+    });
+    state.filling = false;
+  }
+  window.settingsUi.onMessage = function (message) {
+    if (!message || message.url !== "/picker/state") return;
+    var data = message.data || {};
+    error.innerHTML = "";
+    if (!data.ok) { count.textContent = "读取失败"; error.innerHTML = "<div class='error'></div>"; error.firstChild.textContent = data.error || "读取失败"; return; }
+    var view = data.view || {};
+    state.cwd = view.cwd || "process"; state.upTo = view.upTo; state.folders = view.folders || []; state.files = view.files || []; state.processes = data.processes || [];
+    if (data.settings) fill(data.settings);
+    render();
+  };
+  ["team", "elementTeam", "pause", "noSkip", "noEat", "useBreakPoint", "xiaoxitongzhi"].forEach(function (name) {
+    document.getElementById(name).addEventListener("change", function () { if (!state.filling) post("/picker/saveSettings", payload()); });
+  });
+  document.getElementById("btnBack").onclick = function () { settings.classList.remove("active"); browser.classList.add("active"); };
+  document.getElementById("btnSettings").onclick = function () { browser.classList.remove("active"); settings.classList.add("active"); };
+  document.getElementById("btnRefresh").onclick = function () { post("/picker/refresh", { path: state.cwd }); };
+  document.getElementById("btnUp").onclick = function () { if (state.upTo) post("/picker/up", { path: state.upTo }); };
+  document.getElementById("search").oninput = function () { state.query = this.value.trim(); render(); };
+  document.querySelectorAll(".seg button").forEach(function (button) {
+    button.onclick = function () { state.segment = button.dataset.seg; document.querySelectorAll(".seg button").forEach(function (other) { other.classList.toggle("active", other === button); }); render(); };
+  });
+})();
+</script>
+</body>
+</html>

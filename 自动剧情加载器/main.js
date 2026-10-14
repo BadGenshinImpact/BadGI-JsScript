@@ -1,13 +1,15 @@
-import { chooseProcess } from 'picker.js';
-
 (async function () {
   // 版本和编译信息
   const VERSION = "1.46";
   const BUILD_TIME = "2026.07.12";
 
-  // 读取设置
-  const team = settings.team || "";
-  const elementTeam = settings.elementTeam || "";
+  // 读取设置。settings 是宿主动态对象，要当字符串使用时必须先取值。
+  function settingText(value) {
+    if (value === undefined || value === null) return "";
+    return "" + value;
+  }
+  const team = settingText(settings.team);
+  const elementTeam = settingText(settings.elementTeam);
   let relativePath;
   async function errorlog() {
     // 输出版本和编译时间信息
@@ -2519,14 +2521,14 @@ processKeyPress: async (step) => {
         await sleep(10000);
         return;
       }
-      const picked = await chooseProcess();
-      if (!picked) {
-        log.info("未选择剧情，脚本结束");
+      const processPath = settingText(settings.process_path);
+      if (!processPath) {
+        log.error("请先在 HTML 配置中选择剧情");
         return;
       }
 
-      log.info("执行任务: {path}", picked.name);
-      relativePath = picked.path.replace(/^process[\\/]/, "");
+      log.info("执行任务: {path}", settingText(settings.process_selector) || processPath);
+      relativePath = processPath.replace(/^process[\\/]/, "");
       log.info("启用自动剧情");
       dispatcher.AddTrigger(new RealtimeTimer("AutoSkip"));
       if (!settings.noSkip) {
@@ -2538,7 +2540,7 @@ processKeyPress: async (step) => {
         dispatcher.AddTrigger(new RealtimeTimer("AutoEat"));
       }
       await switchPartyIfNeeded(team);
-      await Execute.executeTalkCommission(picked.path);
+      await Execute.executeTalkCommission(processPath);
       dispatcher.ClearAllTriggers();
       if(settings.xiaoxitongzhi) notification.error("脚本执行完成");
     } catch (error) {
