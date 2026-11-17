@@ -13,7 +13,7 @@
   "settings_ui": "settings.json",
   "main": "main.js",
    "saved_files": [
-    "resuming/*.json"
+    "resuming/"
   ],
   "allow_js_notification": true
 }

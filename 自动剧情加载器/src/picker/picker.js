@@ -1,35 +1,35 @@
 // htmlMask 剧情选择器：枚举 process 目录、与遮罩页面收发选择消息。
-// file / log / htmlMask 均为 BetterGI 注入的引擎全局，模块内直接可用。
+// 依赖：file / log / htmlMask（BetterGI 注入的引擎全局，模块内直接可用）。
 
-// 文件夹读取函数（优化版）
+// 递归读取目录下的文件清单，按需只保留 .json 文件
 async function readFolder(folderPath, onlyJson) {
-    const folderStack = [folderPath];
-    const files = [];
+  const folderStack = [folderPath];
+  const files = [];
 
-    while (folderStack.length > 0) {
-        const currentPath = folderStack.pop();
-        const items = file.ReadPathSync(currentPath);
-        const subFolders = [];
+  while (folderStack.length > 0) {
+    const currentPath = folderStack.pop();
+    const items = file.ReadPathSync(currentPath);
+    const subFolders = [];
 
-        for (const itemPath of items) {
-            if (file.IsFolder(itemPath)) {
-                subFolders.push(itemPath);
-            } else if (!onlyJson || itemPath.toLowerCase().endsWith(".json")) {
-                const pathParts = itemPath.split(/[\\\/]/).filter(Boolean);
-                const fileName = pathParts.pop();
-                files.push({
-                    fullPath: itemPath,
-                    fileName: fileName,
-                    folderPathArray: pathParts
-                });
-            }
-        }
-
-        // 保持原始顺序添加子文件夹
-        folderStack.push(...subFolders.reverse());
+    for (const itemPath of items) {
+      if (file.IsFolder(itemPath)) {
+        subFolders.push(itemPath);
+      } else if (!onlyJson || itemPath.toLowerCase().endsWith(".json")) {
+        const pathParts = itemPath.split(/[\\\/]/).filter(Boolean);
+        const fileName = pathParts.pop();
+        files.push({
+          fullPath: itemPath,
+          fileName: fileName,
+          folderPathArray: pathParts
+        });
+      }
     }
 
-    return files;
+    // 保持原始顺序添加子文件夹
+    folderStack.push(...subFolders.reverse());
+  }
+
+  return files;
 }
 
 const PICKER_ROOT = "process";
@@ -113,6 +113,11 @@ async function countProcesses() {
     .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
+/**
+ * 弹出 htmlMask 剧情选择器，返回用户选中的流程文件。
+ * 用户取消、关闭窗口或 process 目录不存在时返回 null。
+ * @returns {Promise<{name: string, path: string}|null>} 选中项的名称与路径
+ */
 export async function chooseProcess() {
   if (!file.IsFolder(PICKER_ROOT)) {
     log.warn("未找到剧情目录 process/，无法弹出选择器");
